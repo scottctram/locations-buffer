@@ -91,11 +91,23 @@
             let lat = e.lat || (e.center && e.center.lat);
             let lon = e.lon || (e.center && e.center.lon);
             if (!lat || !lon) return null;
+
+            // Compose address if tags exist
+            let tags = e.tags || {};
+            let addressParts = [];
+            if (tags["addr:housenumber"]) addressParts.push(tags["addr:housenumber"]);
+            if (tags["addr:street"]) addressParts.push(tags["addr:street"]);
+            if (tags["addr:city"]) addressParts.push(tags["addr:city"]);
+            if (tags["addr:postcode"]) addressParts.push(tags["addr:postcode"]);
+
+            let address = addressParts.length > 0 ? addressParts.join(", ") : "Address not available";
+            
             return {
               id: e.id,
               name: e.tags && e.tags.name ? e.tags.name : "Starbucks",
               lat,
               lon,
+              address,
             };
           })
           .filter((x) => x !== null);
