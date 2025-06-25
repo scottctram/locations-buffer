@@ -4,18 +4,53 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 18,
 }).addTo(map);
 
-let starbucksData = [];
+let coffeeData = []; // will hold combined Starbucks and/or Tim Hortons data
 const markersLayer = L.layerGroup().addTo(map);
 let bufferCircle = null;
 
-async function loadStarbucks() {
+function clearBuffer() {
+  if (bufferCircle) {
+    map.removeLayer(bufferCircle);
+    bufferCircle = null;
+  }
+}
+
+function distanceKm(latlng1, latlng2) {
+  return latlng1.distanceTo(latlng2) / 1000;
+}
+
+function showLocations(data) {
+  markersLayer.clearLayers();
+  const tbody = document.querySelector("#coffeeTable tbody");
+  tbody.innerHTML = "";
+
+  data.forEach((point) => {
+    const marker = L.marker([point.lat, point.lon])
+      .bindPopup(`${point.brand}: ${point.name}`);
+    markersLayer.addLayer(marker);
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${point.brand}</td>
+      <td>${point.name}</td>
+      <td>${point.address}</td>
+      <td>${point.lat.toFixed(5)}</td>
+      <td>${point.lon.toFixed(5)}</td>
+      <td>${point.distance ? point.distance.toFixed(2) : ""}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function fetchBrandLocations(brand) {
+  // Query OSM for locations of the given brand in Ontario
   const query = `
     [out:json][timeout:25];
     area["name"="Ontario"]["admin_level"=4]->.searchArea;
     (
-      node["brand"="Starbucks"](area.searchArea);
-      way["brand"="Starbucks"](area.searchArea);
-      relation["brand"="Starbucks"](area.searchArea);
+      node["brand"="${brand}"](area.searchArea);
+      way["brand"="${brand}"](area.searchArea);
+      relation["brand"="${brand}"](area.searchArea);
     );
     out center;
   `;
@@ -26,13 +61,12 @@ async function loadStarbucks() {
     const res = await fetch(overpassUrl);
     const data = await res.json();
 
-    starbucksData = data.elements
+    return data.elements
       .map((e) => {
         let lat = e.lat || (e.center && e.center.lat);
         let lon = e.lon || (e.center && e.center.lon);
         if (!lat || !lon) return null;
 
-        // Compose address if tags exist
         let tags = e.tags || {};
         let addressParts = [];
         if (tags["addr:housenumber"]) addressParts.push(tags["addr:housenumber"]);
@@ -44,52 +78,50 @@ async function loadStarbucks() {
 
         return {
           id: e.id,
-          name: tags.name || "Starbucks",
+          brand,
+          name: tags.name || brand,
           lat,
           lon,
           address,
         };
       })
       .filter((x) => x !== null);
-
-    showStarbucks(starbucksData);
   } catch (error) {
-    alert("Failed to load Starbucks data from Overpass API.");
+    alert(`Failed to load ${brand} data from Overpass API.`);
     console.error(error);
+    return [];
   }
 }
 
-function showStarbucks(data) {
+document.getElementById("brandForm").addEventListener("submit", async (evt) => {
+  evt.preventDefault();
+
+  clearBuffer();
   markersLayer.clearLayers();
-  const tbody = document.querySelector("#starbucksTable tbody");
-  tbody.innerHTML = "";
+  document.querySelector("#coffeeTable tbody").innerHTML = "";
 
-  data.forEach((point) => {
-    const marker = L.marker([point.lat, point.lon]).bindPopup(point.name);
-    markersLayer.addLayer(marker);
+  const formData = new FormData(evt.target);
+  const selectedBrands = formData.getAll("brand");
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-        <td>${point.name}</td>
-        <td>${point.address}</td>
-        <td>${point.lat.toFixed(5)}</td>
-        <td>${point.lon.toFixed(5)}</td>
-        <td>${point.distance ? point.distance.toFixed(2) : ''}</td>
-        `;
-    tbody.appendChild(tr);
-  });
-}
-
-function distanceKm(latlng1, latlng2) {
-  return latlng1.distanceTo(latlng2) / 1000;
-}
-
-function clearBuffer() {
-  if (bufferCircle) {
-    map.removeLayer(bufferCircle);
-    bufferCircle = null;
+  if (selectedBrands.length === 0) {
+    alert("Please select at least one brand.");
+    return;
   }
-}
+
+  // Disable "Find near me" button until data loads
+  const findMeBtn = document.getElementById("findMe");
+  findMeBtn.disabled = true;
+
+  // Fetch data for each selected brand, combine results
+  coffeeData = [];
+  for (const brand of selectedBrands) {
+    const locations = await fetchBrandLocations(brand);
+    coffeeData = coffeeData.concat(locations);
+  }
+
+  showLocations(coffeeData);
+  findMeBtn.disabled = false;
+});
 
 document.getElementById("findMe").addEventListener("click", () => {
   clearBuffer();
@@ -106,7 +138,7 @@ map.on("locationfound", function (e) {
     fill: false,
   }).addTo(map);
 
-  let filtered = starbucksData
+  let filtered = coffeeData
     .map((s) => {
       let dist = distanceKm(userLoc, L.latLng(s.lat, s.lon));
       return { ...s, distance: dist };
@@ -116,17 +148,18 @@ map.on("locationfound", function (e) {
   filtered.sort((a, b) => a.distance - b.distance);
 
   markersLayer.clearLayers();
-  const tbody = document.querySelector("#starbucksTable tbody");
+  const tbody = document.querySelector("#coffeeTable tbody");
   tbody.innerHTML = "";
 
   filtered.forEach((point) => {
     const marker = L.marker([point.lat, point.lon]).bindPopup(
-      `${point.name}<br>Distance: ${point.distance.toFixed(2)} km`
+      `${point.brand}: ${point.name}<br>Distance: ${point.distance.toFixed(2)} km`
     );
     markersLayer.addLayer(marker);
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
+      <td>${point.brand}</td>
       <td>${point.name}</td>
       <td>${point.address}</td>
       <td>${point.lat.toFixed(5)}</td>
@@ -136,11 +169,9 @@ map.on("locationfound", function (e) {
     tbody.appendChild(tr);
   });
 
-  if (filtered.length === 0) alert("No Starbucks found within 15 km.");
+  if (filtered.length === 0) alert("No locations found within 15 km.");
 });
 
 map.on("locationerror", function () {
   alert("Could not get your location. Please allow location access.");
 });
-
-loadStarbucks();
