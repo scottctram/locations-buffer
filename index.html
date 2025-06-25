@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Starbucks Locator Ontario</title>
+  <title>Coffee Locator Ontario</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet/dist/leaflet.css"
@@ -11,12 +11,20 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>Starbucks Locator Ontario</h1>
-  <button id="findMe">Find Starbucks near me (15 km)</button>
+  <h1>Coffee Locator Ontario</h1>
 
-  <table id="starbucksTable">
+  <form id="brandForm">
+    <label><input type="checkbox" name="brand" value="Starbucks" checked /> Starbucks</label>
+    <label><input type="checkbox" name="brand" value="Tim Hortons" checked /> Tim Hortons</label>
+    <button type="submit">Load Locations</button>
+  </form>
+
+  <button id="findMe" disabled>Find Locations near me (15 km)</button>
+
+  <table id="coffeeTable">
     <thead>
       <tr>
+        <th>Brand</th>
         <th>Name</th>
         <th>Address</th>
         <th>Latitude</th>
