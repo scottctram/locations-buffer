@@ -1,10 +1,10 @@
-const map = L.map("map").setView([51.2538, -85.3232], 6); // Ontario approx center
+const map = L.map("map").setView([51.2538, -85.3232], 6);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 18,
 }).addTo(map);
 
-let coffeeData = []; // will hold combined Starbucks and/or Tim Hortons data
+let coffeeData = [];
 const markersLayer = L.layerGroup().addTo(map);
 let bufferCircle = null;
 
@@ -42,8 +42,7 @@ function showLocations(data) {
   });
 }
 
-async function fetchBrandLocations(brand) {
-  // Query OSM for locations of the given brand in Ontario
+async function fetchBrandLocations(brand, retries = 3) {
   const query = `
     [out:json][timeout:25];
     area["name"="Ontario"]["admin_level"=4]->.searchArea;
@@ -55,10 +54,11 @@ async function fetchBrandLocations(brand) {
     out center;
   `;
   const overpassUrl =
-      "https://lz4.overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
+    "https://lz4.overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
 
   try {
     const res = await fetch(overpassUrl);
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     const data = await res.json();
 
     return data.elements
@@ -87,6 +87,11 @@ async function fetchBrandLocations(brand) {
       })
       .filter((x) => x !== null);
   } catch (error) {
+    if (retries > 0) {
+      console.warn(`Retrying fetch for ${brand}, attempts left: ${retries}`);
+      await new Promise((res) => setTimeout(res, 2000));
+      return fetchBrandLocations(brand, retries - 1);
+    }
     alert(`Failed to load ${brand} data from Overpass API.`);
     console.error(error);
     return [];
@@ -108,11 +113,9 @@ document.getElementById("brandForm").addEventListener("submit", async (evt) => {
     return;
   }
 
-  // Disable "Find near me" button until data loads
   const findMeBtn = document.getElementById("findMe");
   findMeBtn.disabled = true;
 
-  // Fetch data for each selected brand, combine results
   coffeeData = [];
   for (const brand of selectedBrands) {
     const locations = await fetchBrandLocations(brand);
