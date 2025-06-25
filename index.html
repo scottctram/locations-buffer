@@ -46,6 +46,7 @@
     <thead>
       <tr>
         <th>Name</th>
+        <th>Address</th>
         <th>Latitude</th>
         <th>Longitude</th>
         <th>Distance (km)</th>
@@ -130,11 +131,12 @@
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>${point.name}</td>
-          <td>${point.lat.toFixed(5)}</td>
-          <td>${point.lon.toFixed(5)}</td>
-          <td></td>
-        `;
+            <td>${point.name}</td>
+            <td>${point.address}</td>
+            <td>${point.lat.toFixed(5)}</td>
+            <td>${point.lon.toFixed(5)}</td>
+            <td>${point.distance ? point.distance.toFixed(2) : ''}</td>
+            `;
         tbody.appendChild(tr);
       });
     }
