@@ -55,7 +55,7 @@ async function fetchBrandLocations(brand) {
     out center;
   `;
   const overpassUrl =
-    "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
+      "https://lz4.overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
 
   try {
     const res = await fetch(overpassUrl);
